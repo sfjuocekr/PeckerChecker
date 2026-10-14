@@ -7,8 +7,8 @@ local PeckerChecker = LibStub("AceAddon-3.0"):NewAddon(
 
 local peckerMessages = {
     joined = {
-        "%n just joined the guild with a %p sized pecker!",
-        "%n has joined the guild and has a %p sized pecker!",
+        "%n just joined the guild with a size %p pecker!",
+        "%n has joined the guild and has a size %p pecker!",
         "%n weclome to the guild you have a size %p pecker!",
         "Welcome %n to the guild with a size %p pecker!",
         "Everyone say hello to %n with a size %p measured pecker!",
