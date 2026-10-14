@@ -1,4 +1,4 @@
-PeckerChecker = LibStub("AceAddon-3.0"):NewAddon(
+local PeckerChecker = LibStub("AceAddon-3.0"):NewAddon(
     "PeckerChecker",
     "AceConsole-3.0",
     "AceEvent-3.0"
@@ -42,7 +42,7 @@ local peckerMessages = {
 
 local peckerSecret = 420
 local guildMembers = {}
-local guildMessages = {}
+--local guildMessages = {}
 local rosterInitialized = false
 
 
@@ -151,7 +151,7 @@ function PeckerChecker:HandleGuildMessage(text, playerName)
 end
 
 
-function PeckerChecker:OnPlayerRegenEnabled()
+--[[function PeckerChecker:OnPlayerRegenEnabled()
     self:Print("COMBAT LOCKDOWN: " .. tostring(IsEncounterInProgress()))
 
     self:UnregisterEvent("PLAYER_REGEN_ENABLED")
@@ -166,7 +166,7 @@ function PeckerChecker:OnPlayerRegenEnabled()
     end
 
     --guildMessages = {}
-end
+end]]
 
 
 function PeckerChecker:OnChatMsgGuild(_, text, playerName)
@@ -223,7 +223,7 @@ function PeckerChecker:CheckPecker()
                         SendChatMessage("I have joined the guild with a " .. pecker .. " sized pecker!", "GUILD")
                     else
                         --SendChatMessage(name .. " has joined the guild with a " .. pecker .. " sized pecker!", "GUILD")
-                        SendChatMessage(self:RandomMessage("levelUp", {n = name, p = pecker}), "GUILD")
+                        SendChatMessage(self:RandomMessage("joined", {n = name, p = pecker}), "GUILD")
                     end
                 end
             else
