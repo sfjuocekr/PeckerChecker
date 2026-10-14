@@ -35,7 +35,7 @@ local peckerMessages = {
         "%n your pecker is size %p!",
         "%n your pecker measured %p!",
         "%n has a pecker measured %p!",
-        "%n you have a %p sized pecker!",
+        "%n you have a size %p pecker!",
     }
 }
 
