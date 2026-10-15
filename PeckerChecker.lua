@@ -42,11 +42,22 @@ local peckerMessages = {
 
 local peckerSecret = 420
 local guildMembers = {}
---local guildMessages = {}
 local rosterInitialized = false
 
 
+local defaults = {
+    global = {
+        zoneTemperature = {},
+    },
+}
+
+
 function PeckerChecker:OnInitialize()
+    self.db = LibStub("AceDB-3.0"):New(
+        "PeckerCheckerDB",
+        defaults
+    )
+
     self:RegisterEvent("PLAYER_LOGIN", "OnPlayerLogin")
 end
 
@@ -78,8 +89,8 @@ function PeckerChecker:OnPlayerGuildUpdate()
 end
 
 
--- Deterministic hash: the same GUID and secret produce the same result.
-function PeckerChecker:GeneratePecker(guid, level)
+-- PeckerRNG creates a deterministic hash: the same GUID and secret produce the same result.
+function PeckerChecker:GeneratePecker(guid)
     if not guid then
         return nil
     end
@@ -93,20 +104,40 @@ function PeckerChecker:GeneratePecker(guid, level)
     end
 
     -- Base score: 1-15.
-    local baseScore = (hash % 15) + 1
-
-    -- Level bonus: 0-6, capped at level 60.
-    local levelBonus = math.min(6, math.floor((level or 0) / 10))
-
-    return baseScore + levelBonus
+    return (hash % 15) + 1
 end
 
 
-function PeckerChecker:CreateGuildMember(name, level, guid)
+function PeckerChecker:HandleZoneTemperature(zone)
+    if not zone or zone == "" then
+        return 0
+    end
+
+    local zoneTemperature = self.db.global.zoneTemperature
+
+    if zoneTemperature[zone] == nil then
+        zoneTemperature[zone] = 0
+    end
+
+    return zoneTemperature[zone]
+end
+
+
+function PeckerChecker:AugmentPecker(pecker, level, zone)
+    local levelBonus = math.min(math.floor((level) / 10), 6)
+    local temperature = self:HandleZoneTemperature(zone)
+
+    return pecker + temperature + levelBonus
+end
+
+
+function PeckerChecker:CreateGuildMember(isOnline, name, level, zone, guid)
     return {
+        online = isOnline,
         name = name,
         level = level,
-        pecker = self:GeneratePecker(guid, level),
+        zone = zone,
+        pecker = self:GeneratePecker(guid),
     }
 end
 
@@ -136,13 +167,12 @@ function PeckerChecker:HandleGuildMessage(text, playerName)
 
     for guid, member in pairs(guildMembers) do
         if member.name == playerName then
-            if member.pecker then
-                if guid == UnitGUID("player") then
-                    SendChatMessage("My pecker is size " .. member.pecker .. "!", "GUILD")
-                else
-                    --SendChatMessage(playerName .. " your pecker is size " .. member.pecker .. "!", "GUILD")
-                    SendChatMessage(self:RandomMessage("pecker", {n = member.name, p = member.pecker}), "GUILD")
-                end
+            local pecker = self:AugmentPecker(member.pecker, member.level, member.zone)
+
+            if guid == UnitGUID("player") then
+                C_ChatInfo.SendChatMessage("My pecker is size " .. pecker .. "!", "GUILD")
+            else
+                C_ChatInfo.SendChatMessage(self:RandomMessage("pecker", {n = member.name, p = pecker}), "GUILD")
             end
 
             return
@@ -151,57 +181,11 @@ function PeckerChecker:HandleGuildMessage(text, playerName)
 end
 
 
---[[function PeckerChecker:OnPlayerRegenEnabled()
-    self:Print("COMBAT LOCKDOWN: " .. tostring(IsEncounterInProgress()))
-
-    self:UnregisterEvent("PLAYER_REGEN_ENABLED")
-
-    for index, value in ipairs(guildMessages) do
-        self:Print(tostring(index))
-        self:Print(tostring(value))
-        self:Print(tostring(issecretvalue(value[1])))
-        self:Print(tostring(issecretvalue(value[2])))
-
-        --self:HandleGuildMessage(value.text, value.playerName)
-    end
-
-    --guildMessages = {}
-end]]
-
-
 function PeckerChecker:OnChatMsgGuild(_, text, playerName)
     if issecretvalue(text) or issecretvalue(playerName) then
         return
     else
         self:HandleGuildMessage(text, playerName)
-    end
-
-    --[[if InCombatLockdown() then
-        self:Print("COMBAT LOCKDOWN: " .. tostring(IsEncounterInProgress()))
-
-        if not IsEncounterInProgress() then
-            self:HandleGuildMessage(text, playerName)
-        else
-            self:Print("text" .. tostring(issecretvalue(text)))
-            self:Print("playerName" .. tostring(issecretvalue(playerName)))
-
-            table.insert(guildMessages, {text, playerName})
-
-            self:RegisterEvent("PLAYER_REGEN_ENABLED", "OnPlayerRegenEnabled")
-        end
-    else
-        self:Print("NO COMBAT LOCKDOWN")
-
-        self:HandleGuildMessage(text, playerName)
-    end]]
-end
-
-
-function PeckerChecker:OnGuildRosterUpdate()
-    self:CheckPecker()
-
-    if rosterInitialized then
-        self:CheckLevelUp()
     end
 end
 
@@ -210,30 +194,35 @@ function PeckerChecker:CheckPecker()
     local numMembers = GetNumGuildMembers()
 
     for i = 1, numMembers do
-        local name, _, _, level, _, _, _, _, _, _, _, _, _, _, _, _, guid = GetGuildRosterInfo(i)
+        local name, _, _, level, _, zone, _, _, isOnline, _, _, _, _, _, _, _, guid = GetGuildRosterInfo(i)
 
         if guid then
             if rosterInitialized then
                 if not guildMembers[guid] then
-                    local pecker = self:GeneratePecker(guid, level)
+                    guildMembers[guid] = self:CreateGuildMember(isOnline, name, level, zone, guid)
 
-                    guildMembers[guid] = self:CreateGuildMember(name, level, guid)
+                    local pecker = self:AugmentPecker(guildMembers[guid].pecker, level, "")
 
                     if guid == UnitGUID("player") then
-                        SendChatMessage("I have joined the guild with a " .. pecker .. " sized pecker!", "GUILD")
+                        C_ChatInfo.SendChatMessage("I have joined the guild with a size " .. pecker .. " pecker!", "GUILD")
                     else
-                        --SendChatMessage(name .. " has joined the guild with a " .. pecker .. " sized pecker!", "GUILD")
-                        SendChatMessage(self:RandomMessage("joined", {n = name, p = pecker}), "GUILD")
+                        C_ChatInfo.SendChatMessage(self:RandomMessage("joined", {n = name, p = pecker}), "GUILD")
+                    end
+                else
+                    if guildMembers[guid].name ~= name then
+                        guildMembers[guid].name = name
+                    end
+
+                    if guildMembers[guid].zone ~= zone then
+                        guildMembers[guid].zone = zone
+                    end
+
+                    if guildMembers[guid].online ~= isOnline then
+                        guildMembers[guid].online = isOnline
                     end
                 end
             else
-                local pecker = self:GeneratePecker(guid, level)
-
-                guildMembers[guid] = {
-                    name = name,
-                    level = level,
-                    pecker = pecker,
-                }
+                guildMembers[guid] = self:CreateGuildMember(isOnline, name, level, zone, guid)
             end
         end
     end
@@ -248,7 +237,7 @@ function PeckerChecker:CheckLevelUp()
     local numMembers = GetNumGuildMembers()
 
     for i = 1, numMembers do
-        local name, _, _, level, _, _, _, _, isOnline, _, _, _, _, _, _, _, guid = GetGuildRosterInfo(i)
+        local name, _, _, level, _, zone, _, _, isOnline, _, _, _, _, _, _, _, guid = GetGuildRosterInfo(i)
 
         if not guid then
             return
@@ -258,33 +247,35 @@ function PeckerChecker:CheckLevelUp()
 
         if isOnline then
             if level > previousLevel then
-                --self:Print("Dinged: " .. name .. " " .. previousLevel .. " " .. level .. " " .. tostring(isOnline))
+                local oldScore = self:AugmentPecker(guildMembers[guid].pecker, previousLevel, "")
+                local newScore = self:AugmentPecker(guildMembers[guid].pecker, level, "")
 
-                local oldScore = guildMembers[guid].pecker
-                local newScore = self:GeneratePecker(guid, level)
+                guildMembers[guid].level = level
 
                 if oldScore < newScore then
-                    guildMembers[guid].pecker = newScore
-                    guildMembers[guid].level = level
-
                     if guid == UnitGUID("player") then
                         C_ChatInfo.SendChatMessage("My pecker grew to " .. newScore .. "!", "GUILD")
                     else
-                        --C_ChatInfo.SendChatMessage("Congratulations " .. name .. " your pecker grew to " .. newScore .. "!", "GUILD")
                         C_ChatInfo.SendChatMessage(self:RandomMessage("growUp", {n = name, p = newScore}), "GUILD")
                     end
                 else
-                    guildMembers[guid].level = level
-
                     if guid == UnitGUID("player") then
                         C_ChatInfo.SendChatMessage("Ding, level " .. level .. "!", "GUILD")
                     else
-                        --C_ChatInfo.SendChatMessage("Gratz " .. name .. "!", "GUILD")
                         C_ChatInfo.SendChatMessage(self:RandomMessage("levelUp", {n = name, l = level}), "GUILD")
                     end
                 end
             end
         end
+    end
+end
+
+
+function PeckerChecker:OnGuildRosterUpdate()
+    self:CheckPecker()
+
+    if rosterInitialized then
+        self:CheckLevelUp()
     end
 end
 
