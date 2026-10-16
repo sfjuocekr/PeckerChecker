@@ -67,6 +67,7 @@ function PeckerChecker:OnPlayerLogin()
 
     if IsInGuild() then
         self:RegisterEvent("CHAT_MSG_GUILD", "OnChatMsgGuild")
+        self:RegisterEvent("CHAT_MSG_WHISPER", "OnChatMsgWhisper")
         self:RegisterEvent("GUILD_ROSTER_UPDATE", "OnGuildRosterUpdate")
 
         C_GuildInfo.GuildRoster()
@@ -79,11 +80,13 @@ end
 function PeckerChecker:OnPlayerGuildUpdate()
     if IsInGuild() then
         self:RegisterEvent("CHAT_MSG_GUILD", "OnChatMsgGuild")
+        self:RegisterEvent("CHAT_MSG_WHISPER", "OnChatMsgWhisper")
         self:RegisterEvent("GUILD_ROSTER_UPDATE", "OnGuildRosterUpdate")
 
         C_GuildInfo.GuildRoster()
     else
         self:UnregisterEvent("CHAT_MSG_GUILD")
+        self:UnregisterEvent("CHAT_MSG_WHISPER")
         self:UnregisterEvent("GUILD_ROSTER_UPDATE")
     end
 end
@@ -160,8 +163,19 @@ function PeckerChecker:RandomMessage(category, values)
 end
 
 
+function PeckerChecker:GetKeyword(keyword, text)
+    if text ~= nil then
+        if not (text:lower():match("^%s*!" .. keyword .. "%s*$") == nil) then
+            return true
+        end
+    end
+
+    return nil
+end
+
+
 function PeckerChecker:HandleGuildMessage(text, playerName)
-    if not text or text:lower():match("^%s*!pecker%s*$") == nil then
+    if not self:GetKeyword("pecker", text) then
         return
     end
 
@@ -181,20 +195,15 @@ function PeckerChecker:HandleGuildMessage(text, playerName)
 end
 
 
-function PeckerChecker:OnChatMsgGuild(_, text, playerName)
-    if issecretvalue(text) or issecretvalue(playerName) then
-        return
-    else
-        self:HandleGuildMessage(text, playerName)
-    end
-end
-
-
 function PeckerChecker:CheckPecker()
     local numMembers = GetNumGuildMembers()
 
     for i = 1, numMembers do
         local name, _, _, level, _, zone, _, _, isOnline, _, _, _, _, _, _, _, guid = GetGuildRosterInfo(i)
+
+        if zone then
+            self:HandleZoneTemperature(zone)
+        end
 
         if guid then
             if rosterInitialized then
@@ -271,7 +280,46 @@ function PeckerChecker:CheckLevelUp()
 end
 
 
+function IsRestrictedZone()
+    local inInstance, instanceType = IsInInstance()
+    local isPvP = inInstance and instanceType == "pvp"
+
+    return isPvP
+end
+
+
+function PeckerChecker:OnChatMsgGuild(_, text, playerName)
+    if issecretvalue(text) or issecretvalue(playerName) or IsRestrictedZone() then
+        return
+    else
+        self:HandleGuildMessage(text, playerName)
+    end
+end
+
+
+function PeckerChecker:OnChatMsgWhisper(_, text, playerName, _, _, _, _, _, _, _, _, _, guid)
+    if issecretvalue(text) or issecretvalue(playerName) or IsRestrictedZone() then
+        return
+    else
+        if self:GetKeyword("pecker", text) then
+            C_ChatInfo.SendChatMessage("Your pecker is a size " .. self:GeneratePecker(guid), "WHISPER", nil, playerName)
+
+            return
+        end
+    end
+
+    --[[for i = 1, select("#", ...) do
+        local value = select(i, ...)
+        self:Print(i .. ": " .. tostring(value))
+    end]]
+end
+
+
 function PeckerChecker:OnGuildRosterUpdate()
+    if IsRestrictedZone() then
+        return
+    end
+
     self:CheckPecker()
 
     if rosterInitialized then
@@ -289,3 +337,19 @@ function PeckerChecker:GetPeckerByName(playerName)
 
     return nil
 end
+
+
+function PeckerChecker:GetTargetPecker()
+    if UnitGUID("target") ~= nil then
+        self:Print(self:GeneratePecker(UnitGUID("target")))
+    end
+end
+
+
+function PeckerChecker:GetPlayerPecker(input)
+    self:Print(self:GeneratePecker(UnitGUID("player")))
+end
+
+
+PeckerChecker:RegisterChatCommand("pt", "GetTargetPecker")
+PeckerChecker:RegisterChatCommand("pp", "GetPlayerPecker")
