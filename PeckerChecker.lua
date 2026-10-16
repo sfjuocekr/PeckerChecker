@@ -1,7 +1,8 @@
 local PeckerChecker = LibStub("AceAddon-3.0"):NewAddon(
     "PeckerChecker",
     "AceConsole-3.0",
-    "AceEvent-3.0"
+    "AceEvent-3.0",
+    "AceComm-3.0"
 )
 
 
@@ -52,13 +53,55 @@ local defaults = {
 }
 
 
+local peckerPeers = {}
+
+
 function PeckerChecker:OnInitialize()
+    self:Print("OnInitialize")
+
     self.db = LibStub("AceDB-3.0"):New(
         "PeckerCheckerDB",
         defaults
     )
 
     self:RegisterEvent("PLAYER_LOGIN", "OnPlayerLogin")
+end
+
+
+function PeckerChecker:OnEnable()
+    self:Print("OnEnable")
+
+    self:RegisterComm("PC_REG", "OnRegisterPeckerChecker")
+    self:RegisterComm("PC_ROLL", "OnRollPeckerChecker")
+
+    self:SendCommMessage(
+        "PC_REG",
+        UnitGUID("player"),
+        "GUILD"
+    )
+end
+
+
+function PeckerChecker:OnCommReceived(...)
+    self:Print("OnCommReceived")
+
+    for i = 1, select("#", ...) do
+        local value = select(i, ...)
+        self:Print(i .. ": " .. tostring(value))
+    end
+end
+
+
+function PeckerChecker:OnRegisterPeckerChecker(_, message)
+    self:Print("OnRegisterPeckerChecker")
+    self:Print("Registered: " .. message)
+
+    peckerPeers[message] = self:GeneratePecker(message)
+end
+
+
+function PeckerChecker:OnRollPeckerChecker(_, message)
+    self:Print("OnRollPeckerChecker")
 end
 
 
@@ -201,6 +244,7 @@ function PeckerChecker:CheckPecker()
     for i = 1, numMembers do
         local name, _, _, level, _, zone, _, _, isOnline, _, _, _, _, _, _, _, guid = GetGuildRosterInfo(i)
 
+        -- TODO: this just collects zone names for now.
         if zone then
             self:HandleZoneTemperature(zone)
         end
@@ -228,6 +272,10 @@ function PeckerChecker:CheckPecker()
 
                     if guildMembers[guid].online ~= isOnline then
                         guildMembers[guid].online = isOnline
+
+                        if peckerPeers[guid] and not isOnline then
+                            peckerPeers[guid] = nil
+                        end
                     end
                 end
             else
@@ -304,11 +352,6 @@ function PeckerChecker:OnChatMsgWhisper(_, text, playerName, _, _, _, _, _, _, _
             return
         end
     end
-
-    --[[for i = 1, select("#", ...) do
-        local value = select(i, ...)
-        self:Print(i .. ": " .. tostring(value))
-    end]]
 end
 
 
@@ -343,10 +386,18 @@ function PeckerChecker:GetTargetPecker()
 end
 
 
-function PeckerChecker:GetPlayerPecker(input)
+function PeckerChecker:GetPlayerPecker()
     self:Print(self:GeneratePecker(UnitGUID("player")))
+end
+
+
+function PeckerChecker:PeckerDebug()
+    for k, v in pairs(peckerPeers) do
+        self:Print(k .. ": " .. v)
+    end
 end
 
 
 PeckerChecker:RegisterChatCommand("pt", "GetTargetPecker")
 PeckerChecker:RegisterChatCommand("pp", "GetPlayerPecker")
+PeckerChecker:RegisterChatCommand("pd", "PeckerDebug")
