@@ -246,32 +246,29 @@ function PeckerChecker:CheckLevelUp()
     local numMembers = GetNumGuildMembers()
 
     for i = 1, numMembers do
-        local name, _, _, level, _, zone, _, _, isOnline, _, _, _, _, _, _, _, guid = GetGuildRosterInfo(i)
-
-        if not guid then
-            return
-        end
-
+        local name, _, _, level, _, _, _, _, isOnline, _, _, _, _, _, _, _, guid = GetGuildRosterInfo(i)
         local previousLevel = guildMembers[guid].level
 
-        if isOnline then
-            if level > previousLevel then
-                local oldScore = self:AugmentPecker(guildMembers[guid].pecker, previousLevel, "")
-                local newScore = self:AugmentPecker(guildMembers[guid].pecker, level, "")
+        if guid then
+            if isOnline then
+                if level > previousLevel then
+                    local oldScore = self:AugmentPecker(guildMembers[guid].pecker, previousLevel, "")
+                    local newScore = self:AugmentPecker(guildMembers[guid].pecker, level, "")
 
-                guildMembers[guid].level = level
+                    guildMembers[guid].level = level
 
-                if oldScore < newScore then
-                    if guid == UnitGUID("player") then
-                        C_ChatInfo.SendChatMessage("My pecker grew to " .. newScore .. "!", "GUILD")
+                    if oldScore < newScore then
+                        if guid == UnitGUID("player") then
+                            C_ChatInfo.SendChatMessage("My pecker grew to " .. newScore .. "!", "GUILD")
+                        else
+                            C_ChatInfo.SendChatMessage(self:RandomMessage("growUp", {n = name, p = newScore}), "GUILD")
+                        end
                     else
-                        C_ChatInfo.SendChatMessage(self:RandomMessage("growUp", {n = name, p = newScore}), "GUILD")
-                    end
-                else
-                    if guid == UnitGUID("player") then
-                        C_ChatInfo.SendChatMessage("Ding, level " .. level .. "!", "GUILD")
-                    else
-                        C_ChatInfo.SendChatMessage(self:RandomMessage("levelUp", {n = name, l = level}), "GUILD")
+                        if guid == UnitGUID("player") then
+                            C_ChatInfo.SendChatMessage("Ding, level " .. level .. "!", "GUILD")
+                        else
+                            C_ChatInfo.SendChatMessage(self:RandomMessage("levelUp", {n = name, l = level}), "GUILD")
+                        end
                     end
                 end
             end
